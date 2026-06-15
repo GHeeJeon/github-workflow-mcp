@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   getBranchSha,
   createBranch,
+  createIssue,
   createPR,
   getPRReviews,
   getPRComments,
@@ -95,6 +96,17 @@ export async function runCreatePRTool(args, {
   return {
     content: [{ type: 'text', text: `Created PR #${pr.number}: ${pr.html_url}` }],
     structuredContent: { url: pr.html_url, number: pr.number, title: pr.title },
+  };
+}
+
+export async function runCreateIssueTool(args, {
+  token, owner, repo,
+  _createIssue = createIssue,
+}) {
+  const issue = await _createIssue(owner, repo, args.title, args.body ?? '', args.labels ?? [], token);
+  return {
+    content: [{ type: 'text', text: `Created issue #${issue.number}: ${issue.html_url}` }],
+    structuredContent: { url: issue.html_url, number: issue.number, title: issue.title, labels: issue.labels.map(l => l.name) },
   };
 }
 
@@ -224,6 +236,17 @@ export function createServer(env) {
     name: 'github-workflow-mcp',
     version: '0.1.0',
   });
+
+  server.tool(
+    'create_issue',
+    'Create a GitHub issue with a title, body, and optional labels.',
+    {
+      title: z.string().describe('Issue title'),
+      body: z.string().optional().describe('Issue body (markdown supported)'),
+      labels: z.array(z.string()).optional().describe('Label names to attach (e.g. ["bug", "enhancement"])'),
+    },
+    (args) => runCreateIssueTool(args, ctx),
+  );
 
   server.tool(
     'create_branch',

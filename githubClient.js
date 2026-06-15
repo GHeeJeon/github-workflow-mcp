@@ -58,6 +58,14 @@ export async function createPR(owner, repo, title, body, head, base, token) {
   });
 }
 
+export async function createIssue(owner, repo, title, body, labels, token) {
+  return githubRequest(token, 'POST', `/repos/${owner}/${repo}/issues`, {
+    title,
+    body,
+    labels: labels ?? [],
+  });
+}
+
 export async function getPRReviews(owner, repo, prNumber, token) {
   return githubRequest(token, 'GET', `/repos/${owner}/${repo}/pulls/${prNumber}/reviews`);
 }
@@ -111,7 +119,7 @@ export function commitAndPush(repoPath, message, files = ['.']) {
     gitExec(['add', f], repoPath);
   }
   gitExec(['commit', '-m', message], repoPath);
-  gitExec(['push'], repoPath);
+  gitExec(['push', '-u', 'origin', 'HEAD'], repoPath);
 }
 
 export function parsePRNumber(prUrl) {

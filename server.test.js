@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   isDirectExecution,
+  runCreateIssueTool,
   runCreateBranchTool,
   runRunTestsTool,
   runCommitAndPushTool,
@@ -19,6 +20,60 @@ test('isDirectExecution returns false when argv1 is null', () => {
 
 test('isDirectExecution returns false when invoked as a module', () => {
   assert.equal(isDirectExecution('/some/other/entry.js', import.meta.url), false);
+});
+
+// --- create_issue ---
+
+test('runCreateIssueTool returns issue URL and number', async () => {
+  const result = await runCreateIssueTool(
+    { title: 'Login button broken', body: 'Clicking login does nothing.', labels: ['bug'] },
+    {
+      token: 'tok', owner: 'org', repo: 'repo',
+      _createIssue: async () => ({
+        number: 3,
+        html_url: 'https://github.com/org/repo/issues/3',
+        title: 'Login button broken',
+        labels: [{ name: 'bug' }],
+      }),
+    },
+  );
+
+  assert.ok(result.content[0].text.includes('#3'));
+  assert.equal(result.structuredContent.number, 3);
+  assert.deepEqual(result.structuredContent.labels, ['bug']);
+});
+
+test('runCreateIssueTool works without body or labels', async () => {
+  const result = await runCreateIssueTool(
+    { title: 'Improve docs' },
+    {
+      token: 'tok', owner: 'org', repo: 'repo',
+      _createIssue: async (owner, repo, title, body, labels) => {
+        assert.equal(body, '');
+        assert.deepEqual(labels, []);
+        return { number: 7, html_url: 'https://github.com/org/repo/issues/7', title, labels: [] };
+      },
+    },
+  );
+
+  assert.equal(result.structuredContent.number, 7);
+  assert.deepEqual(result.structuredContent.labels, []);
+});
+
+test('runCreateIssueTool passes multiple labels', async () => {
+  let capturedLabels;
+  await runCreateIssueTool(
+    { title: 'New feature', labels: ['enhancement', 'good first issue'] },
+    {
+      token: 'tok', owner: 'org', repo: 'repo',
+      _createIssue: async (owner, repo, title, body, labels) => {
+        capturedLabels = labels;
+        return { number: 9, html_url: 'https://github.com/org/repo/issues/9', title, labels: labels.map(n => ({ name: n })) };
+      },
+    },
+  );
+
+  assert.deepEqual(capturedLabels, ['enhancement', 'good first issue']);
 });
 
 // --- create_branch ---
