@@ -1,0 +1,28 @@
+{
+  "name": "@yourname/github-workflow-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MCP server for automating GitHub workflows: branch → test → commit/push → PR.",
+  "type": "module",
+  "bin": {
+    "github-workflow-mcp": "./server.js"
+  },
+  "files": [
+    "README.md",
+    "package.json",
+    "githubClient.js",
+    "server.js"
+  ],
+  "scripts": {
+    "start": "node ./server.js",
+    "test": "node --test ./server.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "zod": "^3.25.76"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
