@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   isDirectExecution,
+  runListLabelsTool,
   runCreateIssueTool,
   runCreateBranchTool,
   runRunTestsTool,
@@ -20,6 +21,34 @@ test('isDirectExecution returns false when argv1 is null', () => {
 
 test('isDirectExecution returns false when invoked as a module', () => {
   assert.equal(isDirectExecution('/some/other/entry.js', import.meta.url), false);
+});
+
+// --- list_labels ---
+
+test('runListLabelsTool returns label names and descriptions', async () => {
+  const result = await runListLabelsTool({}, {
+    token: 'tok', owner: 'org', repo: 'repo',
+    _listLabels: async () => [
+      { name: 'bug', description: 'Something broken', color: 'd73a4a' },
+      { name: 'enhancement', description: 'New feature', color: 'a2eeef' },
+    ],
+  });
+
+  assert.ok(result.content[0].text.includes('bug'));
+  assert.ok(result.content[0].text.includes('enhancement'));
+  assert.ok(result.content[0].text.includes('Something broken'));
+  assert.equal(result.structuredContent.labels.length, 2);
+  assert.equal(result.structuredContent.labels[0].name, 'bug');
+});
+
+test('runListLabelsTool works when labels have no description', async () => {
+  const result = await runListLabelsTool({}, {
+    token: 'tok', owner: 'org', repo: 'repo',
+    _listLabels: async () => [{ name: 'wontfix', description: null, color: 'ffffff' }],
+  });
+
+  assert.ok(result.content[0].text.includes('wontfix'));
+  assert.equal(result.structuredContent.labels[0].description, '');
 });
 
 // --- create_issue ---

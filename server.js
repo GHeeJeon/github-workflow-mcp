@@ -100,6 +100,18 @@ export async function runCreatePRTool(args, {
   };
 }
 
+export async function runListLabelsTool(args, {
+  token, owner, repo,
+  _listLabels = listLabels,
+}) {
+  const labels = await _listLabels(owner, repo, token);
+  const lines = labels.map(l => `- ${l.name}${l.description ? ` — ${l.description}` : ''}`);
+  return {
+    content: [{ type: 'text', text: `Available labels in ${owner}/${repo}:\n${lines.join('\n')}` }],
+    structuredContent: { labels: labels.map(l => ({ name: l.name, description: l.description ?? '', color: l.color })) },
+  };
+}
+
 export async function runCreateIssueTool(args, {
   token, owner, repo,
   _createIssue = createIssue,
@@ -262,12 +274,19 @@ export function createServer(env) {
   });
 
   server.tool(
+    'list_labels',
+    'List all available labels in the repository. Call this before create_issue to see which label names are valid.',
+    {},
+    (args) => runListLabelsTool(args, ctx),
+  );
+
+  server.tool(
     'create_issue',
-    'Create a GitHub issue with a title, body, and optional labels.',
+    'Create a GitHub issue. Use list_labels first to pick valid label names — non-existent labels are rejected.',
     {
       title: z.string().describe('Issue title'),
       body: z.string().optional().describe('Issue body (markdown supported)'),
-      labels: z.array(z.string()).optional().describe('Label names to attach (e.g. ["bug", "enhancement"])'),
+      labels: z.array(z.string()).optional().describe('Label names from list_labels (e.g. ["bug", "enhancement"])'),
     },
     (args) => runCreateIssueTool(args, ctx),
   );
