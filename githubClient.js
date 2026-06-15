@@ -58,6 +58,10 @@ export async function createPR(owner, repo, title, body, head, base, token) {
   });
 }
 
+export async function listLabels(owner, repo, token) {
+  return githubRequest(token, 'GET', `/repos/${owner}/${repo}/labels?per_page=100`);
+}
+
 export async function createIssue(owner, repo, title, body, labels, token) {
   return githubRequest(token, 'POST', `/repos/${owner}/${repo}/issues`, {
     title,

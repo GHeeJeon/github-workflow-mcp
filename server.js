@@ -9,6 +9,7 @@ import {
   getBranchSha,
   createBranch,
   createIssue,
+  listLabels,
   createPR,
   getPRReviews,
   getPRComments,
@@ -102,8 +103,31 @@ export async function runCreatePRTool(args, {
 export async function runCreateIssueTool(args, {
   token, owner, repo,
   _createIssue = createIssue,
+  _listLabels = listLabels,
 }) {
-  const issue = await _createIssue(owner, repo, args.title, args.body ?? '', args.labels ?? [], token);
+  const requestedLabels = args.labels ?? [];
+
+  if (requestedLabels.length > 0) {
+    const existing = await _listLabels(owner, repo, token);
+    const existingNames = new Set(existing.map(l => l.name));
+    const missing = requestedLabels.filter(l => !existingNames.has(l));
+
+    if (missing.length > 0) {
+      return {
+        content: [{
+          type: 'text',
+          text: [
+            `Label(s) not found in repo: ${missing.map(l => `"${l}"`).join(', ')}`,
+            `Available labels: ${[...existingNames].join(', ')}`,
+            `Fix the labels and retry, or omit the labels argument.`,
+          ].join('\n'),
+        }],
+        isError: true,
+      };
+    }
+  }
+
+  const issue = await _createIssue(owner, repo, args.title, args.body ?? '', requestedLabels, token);
   return {
     content: [{ type: 'text', text: `Created issue #${issue.number}: ${issue.html_url}` }],
     structuredContent: { url: issue.html_url, number: issue.number, title: issue.title, labels: issue.labels.map(l => l.name) },

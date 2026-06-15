@@ -29,6 +29,7 @@ test('runCreateIssueTool returns issue URL and number', async () => {
     { title: 'Login button broken', body: 'Clicking login does nothing.', labels: ['bug'] },
     {
       token: 'tok', owner: 'org', repo: 'repo',
+      _listLabels: async () => [{ name: 'bug' }, { name: 'enhancement' }],
       _createIssue: async () => ({
         number: 3,
         html_url: 'https://github.com/org/repo/issues/3',
@@ -60,12 +61,44 @@ test('runCreateIssueTool works without body or labels', async () => {
   assert.deepEqual(result.structuredContent.labels, []);
 });
 
+test('runCreateIssueTool rejects non-existent labels and lists available ones', async () => {
+  const result = await runCreateIssueTool(
+    { title: 'Test', labels: ['bug', '없는라벨'] },
+    {
+      token: 'tok', owner: 'org', repo: 'repo',
+      _listLabels: async () => [{ name: 'bug' }, { name: 'enhancement' }],
+      _createIssue: async () => { throw new Error('should not be called'); },
+    },
+  );
+
+  assert.equal(result.isError, true);
+  assert.ok(result.content[0].text.includes('"없는라벨"'));
+  assert.ok(result.content[0].text.includes('bug'));
+  assert.ok(result.content[0].text.includes('enhancement'));
+});
+
+test('runCreateIssueTool skips label check when no labels provided', async () => {
+  let labelCheckCalled = false;
+  const result = await runCreateIssueTool(
+    { title: 'No label issue' },
+    {
+      token: 'tok', owner: 'org', repo: 'repo',
+      _listLabels: async () => { labelCheckCalled = true; return []; },
+      _createIssue: async () => ({ number: 1, html_url: 'https://github.com/org/repo/issues/1', title: 'No label issue', labels: [] }),
+    },
+  );
+
+  assert.equal(labelCheckCalled, false);
+  assert.equal(result.structuredContent.number, 1);
+});
+
 test('runCreateIssueTool passes multiple labels', async () => {
   let capturedLabels;
   await runCreateIssueTool(
     { title: 'New feature', labels: ['enhancement', 'good first issue'] },
     {
       token: 'tok', owner: 'org', repo: 'repo',
+      _listLabels: async () => [{ name: 'enhancement' }, { name: 'good first issue' }],
       _createIssue: async (owner, repo, title, body, labels) => {
         capturedLabels = labels;
         return { number: 9, html_url: 'https://github.com/org/repo/issues/9', title, labels: labels.map(n => ({ name: n })) };
