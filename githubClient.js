@@ -131,3 +131,11 @@ export function parsePRNumber(prUrl) {
   if (!match) throw new Error(`Cannot parse PR number from URL: ${prUrl}`);
   return parseInt(match[1], 10);
 }
+
+export async function listPRs(owner, repo, token, { state = 'all', perPage = 10 } = {}) {
+  return githubRequest(
+    token,
+    'GET',
+    `/repos/${owner}/${repo}/pulls?state=${state}&per_page=${perPage}&sort=updated&direction=desc`,
+  );
+}

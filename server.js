@@ -10,6 +10,7 @@ import {
   createBranch,
   createIssue,
   listLabels,
+  listPRs,
   createPR,
   getPRReviews,
   getPRComments,
@@ -342,6 +343,59 @@ export function createServer(env) {
       pr_url: z.string().url().describe('Full GitHub PR URL (e.g. https://github.com/owner/repo/pull/42)'),
     },
     (args) => runGetPRReviewSummaryTool(args, ctx),
+  );
+
+  // --- Resources ---
+
+  server.resource(
+    'repo-context',
+    'repo://context',
+    { description: 'Repository file structure and key file contents. Attach before asking Claude to write or modify code.' },
+    async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: 'text/plain', text: await buildRepoContext(ctx.repoPath) }],
+    }),
+  );
+
+  server.resource(
+    'repo-recent-prs',
+    'repo://recent-prs',
+    { description: 'Recent pull requests (up to 10, sorted by last updated). Useful for context on active work.' },
+    async (uri) => {
+      const prs = await listPRs(ctx.owner, ctx.repo, ctx.token);
+      const text = prs.map(pr =>
+        `#${pr.number} [${pr.state}] ${pr.title}\n  ${pr.html_url}\n  Branch: ${pr.head.ref} → ${pr.base.ref}\n  Updated: ${pr.updated_at}`,
+      ).join('\n\n') || 'No pull requests found.';
+      return { contents: [{ uri: uri.href, mimeType: 'text/plain', text }] };
+    },
+  );
+
+  // --- Prompts ---
+
+  server.prompt(
+    'workflow',
+    'Standard prompt for implementing a feature end-to-end using the github-workflow MCP tools.',
+    [{ name: 'task', description: 'Feature or fix to implement', required: true }],
+    ({ task }) => ({
+      messages: [{
+        role: 'user',
+        content: {
+          type: 'text',
+          text: [
+            `Please implement the following task using the github-workflow MCP tools:`,
+            ``,
+            `**Task:** ${task}`,
+            ``,
+            `Follow these steps in order:`,
+            `1. Attach the \`repo://context\` resource to understand the codebase`,
+            `2. Call \`create_branch\` with a descriptive branch name`,
+            `3. Write or modify the necessary files`,
+            `4. Call \`run_tests\` to verify correctness`,
+            `5. Call \`commit_and_push\` with a clear commit message`,
+            `6. Call \`create_pr\` to open a Pull Request`,
+          ].join('\n'),
+        },
+      }],
+    }),
   );
 
   server.tool(
